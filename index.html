@@ -1,0 +1,706 @@
+<!doctype html>
+<html lang="es">
+ <head><script>window["__codeletBootstrap__"]=JSON.parse('{"A":"A","B":"20261027-22-644e373","C":{"DM Sans":"YAD1aU3sLnI,0","Fraunces":"YAFdJpU7Kkk,0"}}');</script><script src="/_sdk/68e0985fbb406a4b.telemetry_sdk.js" integrity="sha512-za+MXpUMcAbtGxoHCIIYxLJA5Qj0VCDt2Y2UBS2RWm2fbgPwm56qNLQkjRkpeh0f4iY7OxzmllM05wWikiJOZA=="></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Simulador de choques y colisiones</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&amp;family=Fraunces:opsz,wght@9..144,600;9..144,700&amp;display=swap" rel="stylesheet">
+  <style>
+    /* ===== Reinicio base ===== */
+    *,*::before,*::after { box-sizing:border-box; }
+    h1,h2,h3,p,ol { margin:0; }
+    h1,h2,h3 { font-size:inherit; font-weight:inherit; }
+    ol { padding:0; list-style:none; }
+    button,input { font:inherit; color:inherit; margin:0; }
+    button { background:transparent; cursor:pointer; }
+    svg { display:block; vertical-align:middle; }
+    strong { font-weight:700; }
+    sub { font-size:75%; line-height:0; position:relative; bottom:-.25em; }
+    input::placeholder { color:#9ca3af; }
+    .hidden { display:none !important; }
+
+    /* ===== Variables ===== */
+    :root {
+      --ink:#0f2733; --muted:#5a6f7a; --line:#dde6e4;
+      --cyan:#0a8aa0; --cyan-d:#06606f; --cyan-l:#e1f2f3;
+      --orange:#e07a35; --orange-l:#fcece0;
+      --paper:#fbfcfa; --soft:#eef3f1; --gold:#f2c46d;
+      --teacher:#25356a; --danger:#b91c1c;
+    }
+    html,body { background:#0b222c; }
+    body { margin:0; font-family:'DM Sans',sans-serif; color:var(--ink); line-height:1.5; -webkit-font-smoothing:antialiased; }
+    h1,h2 { font-family:'Fraunces',serif; letter-spacing:-.01em; font-weight:700; }
+    h2 { font-size:1.45rem; line-height:1.2; }
+
+    /* ===== Fondo y contenedor ===== */
+    .shell { position:relative; width:100%; min-height:100vh; overflow:hidden; padding:40px 16px;
+      background:
+        radial-gradient(900px 500px at 85% -10%, #1f6f7a55, transparent 60%),
+        radial-gradient(700px 420px at -5% 30%, #e07a3522, transparent 60%),
+        linear-gradient(160deg,#0b222c 0%,#123744 48%,#0b222c 100%); }
+    .shell::before { content:""; position:absolute; inset:0; pointer-events:none; opacity:.35;
+      background-image:linear-gradient(#ffffff0d 1px,transparent 1px),linear-gradient(90deg,#ffffff0d 1px,transparent 1px);
+      background-size:44px 44px; -webkit-mask-image:linear-gradient(180deg,#000 0%,transparent 55%); mask-image:linear-gradient(180deg,#000 0%,transparent 55%); }
+    .container { position:relative; max-width:80rem; margin:0 auto; }
+
+    /* ===== Encabezado ===== */
+    .hero { margin-bottom:2.5rem; color:#fff; }
+    .eyebrow { display:inline-flex; align-items:center; gap:.6rem; font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.2em; color:#bfe3e6; }
+    .eyebrow::before { content:""; width:28px; height:2px; background:var(--gold); border-radius:2px; }
+    .credit { display:inline-flex; align-items:center; gap:.5rem; margin-top:.7rem; padding:.38rem .85rem;
+      border:1px solid #ffffff2b; border-radius:999px; background:#ffffff12; -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px);
+      font-size:.88rem; color:#e9f5f4; }
+    .credit svg { width:15px; height:15px; color:var(--gold); }
+    .page-title { margin-top:1.5rem; max-width:none; font-size:clamp(2rem,5vw,4.2rem); line-height:1.05; overflow-wrap:break-word; }
+    .page-title em { font-style:normal; background:linear-gradient(90deg,#7fd6df,var(--gold)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+    .intro { margin-top:1rem; max-width:none; font-size:clamp(1rem,.9rem + .45vw,1.3rem); line-height:1.625; color:#cfe3e4; }
+    .chips { display:flex; flex-wrap:wrap; gap:.5rem; margin-top:1.2rem; }
+    .chip { font-size:.8rem; font-weight:600; color:#d7ecec; padding:.35rem .75rem; border-radius:999px; background:#ffffff10; border:1px solid #ffffff1f; }
+
+    /* ===== Distribución ===== */
+    .stack, .layout-top, .layout-bottom { display:grid; grid-template-columns:minmax(0,1fr); gap:1.5rem; }
+    .stack > *, .layout-top > *, .layout-bottom > * { min-width:0; }
+
+    /* ===== Tarjetas ===== */
+    .surface { background:var(--paper); border:1px solid #ffffff; box-shadow:0 1px 0 #ffffff inset,0 24px 50px -18px #00141c99; }
+    .panel { border-radius:1.5rem; padding:1.25rem; }
+    .card-head { display:flex; align-items:center; gap:.75rem; margin-bottom:.5rem; }
+    .card-head.spaced { margin-bottom:1.25rem; }
+    .card-head.flush { margin-bottom:0; }
+    .icon-badge { flex:none; width:40px; height:40px; border-radius:12px; display:grid; place-items:center; background:var(--cyan-l); color:var(--cyan-d); }
+    .icon-badge.orange { background:var(--orange-l); color:#a84f16; }
+    .icon-badge.teacher { background:#e4e8f6; color:var(--teacher); }
+    .icon-badge svg { width:20px; height:20px; }
+    .help { color:var(--muted); font-size:.94rem; }
+    .help.relaxed { line-height:1.625; }
+    .help.small { font-size:.875rem; }
+    .lead-gap { margin-bottom:1.25rem; }
+
+    /* ===== Formulario ===== */
+    .settings-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:.75rem; row-gap:1rem; }
+    .field-label { display:block; margin-bottom:.375rem; font-size:.82rem; font-weight:700; color:var(--muted); }
+    .field-wrap { position:relative; }
+    .field { width:100%; border:1.5px solid #cfdbdc; border-radius:12px; background:#fff; padding:11px 44px 11px 13px; color:var(--ink); font-weight:600; font-variant-numeric:tabular-nums; transition:border-color .2s, box-shadow .2s; }
+    .field:hover { border-color:#9fb8bc; }
+    .unit { position:absolute; right:12px; top:50%; transform:translateY(-50%); font-size:.78rem; color:#8aa0a8; pointer-events:none; }
+    .body-tag { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; vertical-align:middle; }
+    .tag-cyan { background:var(--cyan); } .tag-orange { background:var(--orange); }
+    .field:focus-visible,button:focus-visible,.table-input:focus-visible { outline:3px solid #28b6c9; outline-offset:2px; }
+    .rule-box { margin-top:1.1rem; padding:.8rem .9rem; border-radius:12px; background:var(--soft); font-size:.84rem; color:var(--muted); line-height:1.5; }
+    .error-msg { margin-top:1rem; font-size:.875rem; font-weight:700; color:var(--danger); }
+
+    /* ===== Pista ===== */
+    .sim-head { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-start; gap:.75rem; margin-bottom:1.25rem; }
+    .sim-subtitle { margin-top:.125rem; }
+    .track { position:relative; height:200px; overflow:hidden; border-radius:18px;
+      background:linear-gradient(180deg,#e3f0ef 0%,#f3f8f5 70%,#cfdcd7 70%,#bfd0ca 100%); border:1px solid #d3e0dd; }
+    .track::before { content:""; position:absolute; left:4%; right:4%; top:70%; border-top:3px solid #4f6a74; border-radius:3px; }
+    .track .ticks { position:absolute; left:4%; right:4%; top:calc(70% + 3px); height:10px;
+      background:repeating-linear-gradient(90deg,#4f6a7466 0 1px,transparent 1px 5%); }
+    .track .center-line { position:absolute; left:50%; top:14%; bottom:30%; border-left:2px dashed #9bb3b8; opacity:.6; }
+    .ball { position:absolute; top:calc(70% - 26px); width:52px; height:52px; border-radius:50%;
+      box-shadow:inset -10px -11px 14px #0004,inset 6px 6px 10px #ffffff40,0 10px 14px -4px #0004;
+      transform:translateX(-50%); display:grid; place-items:center; color:#fff; font-weight:700; font-size:1.05rem; }
+    .ball-one { background:radial-gradient(circle at 35% 30%,#3fc0d2,var(--cyan) 55%,var(--cyan-d)); }
+    .ball-two { background:radial-gradient(circle at 35% 30%,#f6a56d,var(--orange) 55%,#b0571d); }
+    .vtag { position:absolute; bottom:calc(100% + 10px); left:50%; transform:translateX(-50%); white-space:nowrap;
+      font-size:.72rem; font-weight:700; padding:3px 8px; border-radius:8px; background:#ffffffe6; color:var(--ink); box-shadow:0 3px 8px #0002; font-variant-numeric:tabular-nums; }
+    .ball-one .vtag { color:var(--cyan-d); } .ball-two .vtag { color:#a84f16; }
+    .spark { position:absolute; left:50%; top:calc(70% - 2px); width:16px; height:16px; border-radius:50%; transform:translate(-50%,-50%) scale(0);
+      background:radial-gradient(circle,#fff 0%,var(--gold) 45%,transparent 70%); opacity:0; pointer-events:none; }
+    .spark.on { animation:burst .45s ease-out; }
+    @keyframes burst { 0%{ opacity:1; transform:translate(-50%,-50%) scale(.5);} 100%{ opacity:0; transform:translate(-50%,-50%) scale(7);} }
+    .track-legend { display:flex; justify-content:space-between; margin-top:.5rem; padding:0 .25rem; font-size:.75rem; font-weight:600; color:#6b808a; }
+
+    .phase { border-radius:999px; padding:.35rem .85rem; font-size:.82rem; font-weight:700; background:var(--cyan-l); color:var(--cyan-d); transition:background .3s,color .3s; display:inline-flex; align-items:center; gap:.4rem; }
+    .phase::before { content:""; width:8px; height:8px; border-radius:50%; background:currentColor; }
+    .phase.after { background:var(--orange-l); color:#a84f16; }
+
+    /* ===== Botones ===== */
+    .btn-row { display:flex; flex-wrap:wrap; gap:.5rem; margin-top:1.25rem; }
+    .btn { display:inline-flex; align-items:center; gap:.5rem; border-radius:12px; padding:.7rem 1.15rem; font-weight:700; font-size:.92rem; line-height:1.25; border:1.5px solid transparent; transition:transform .15s, box-shadow .2s, background .2s, filter .2s; }
+    .btn svg { width:17px; height:17px; }
+    .btn:active:not(:disabled) { transform:translateY(1px); }
+    .btn-primary { background:linear-gradient(180deg,#0d9bb2,var(--cyan-d)); color:#fff; box-shadow:0 8px 18px -8px #0a8aa0aa; }
+    .btn-primary:hover:not(:disabled) { filter:brightness(1.08); box-shadow:0 10px 22px -8px #0a8aa0cc; }
+    .btn-ghost { background:#fff; color:var(--ink); border-color:#cfdbdc; }
+    .btn-ghost:hover:not(:disabled) { background:var(--soft); }
+    .btn-accent { background:linear-gradient(180deg,#ec8b48,#c9651f); color:#fff; box-shadow:0 8px 18px -8px #e07a35aa; }
+    .btn-accent:hover:not(:disabled) { filter:brightness(1.06); }
+    .btn-teacher { background:linear-gradient(180deg,#3a4f8f,var(--teacher)); color:#fff; box-shadow:0 8px 18px -8px #25356aaa; }
+    .btn-teacher:hover:not(:disabled) { filter:brightness(1.12); }
+    .btn:disabled { opacity:.45; cursor:not-allowed; box-shadow:none; }
+
+    /* ===== Tabla ===== */
+    .table-wrap { border:1px solid var(--line); border-radius:14px; overflow-x:auto; background:#fff; }
+    .data-table { min-width:990px; width:100%; border-collapse:collapse; text-indent:0; }
+    .data-table th,.data-table td { padding:11px 8px; border-bottom:1px solid var(--line); text-align:center; }
+    .data-table tbody tr:last-child th,.data-table tbody tr:last-child td { border-bottom:0; }
+    .data-table th:first-child,.data-table td:first-child { text-align:left; padding-left:16px; }
+    .data-table thead th { font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; color:#4c6570; background:var(--soft); font-weight:700; }
+    .data-table thead th.grp-e { background:#f7efe6; } .data-table thead th.grp-p { background:#e5f1f2; }
+    .data-table tbody th { font-size:14px; white-space:nowrap; }
+    .data-table tbody tr:hover { background:#fafcfb; }
+    .data-table td { font-size:13px; }
+    .table-input { width:100%; min-width:94px; padding:9px 8px; border:1.5px solid #d3dfe0; border-radius:9px; background:#fbfdfc; color:var(--ink); font-weight:600; text-align:right; font-variant-numeric:tabular-nums; transition:border-color .2s, background .2s; }
+    .table-input:hover { border-color:#a9c0c4; }
+    .table-input:focus { background:#fff; }
+    .table-input.is-wrong { border:2px solid #c0303e; background:#fff1f2; color:#8b1722; }
+    .table-input.is-filling { border-color:#3a4f8f; background:#eef1fb; box-shadow:0 0 0 4px #3a4f8f22; animation:fillpop .35s ease-out; }
+    .table-input.is-filled { border-color:#7d8fc7; background:#f3f5fc; color:var(--teacher); }
+    @keyframes fillpop { 0%{ transform:scale(.94);} 60%{ transform:scale(1.05);} 100%{ transform:scale(1);} }
+
+    .review-row { display:flex; flex-wrap:wrap; align-items:center; gap:1rem; margin-top:1.25rem; }
+    .feedback { font-size:.875rem; font-weight:700; }
+    .feedback.is-muted { color:var(--muted); }
+    .feedback.is-error { color:var(--danger); }
+    .feedback.is-ok { color:var(--cyan-d); }
+    .feedback.is-teacher { color:var(--teacher); }
+
+    /* ===== Panel de clave ===== */
+    .key-panel { margin-top:1rem; padding:16px 18px; border-radius:16px; background:#f3f5fc; border:1.5px solid #cdd5ef; animation:rise .3s both; }
+    .key-title { font-size:1.125rem; font-weight:700; }
+    .key-help { margin-bottom:.75rem; }
+    .key-row { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem; }
+    .key-field { width:200px; padding-right:13px; letter-spacing:.2em; }
+    .key-field.shake { animation:shake .35s; border-color:#c0303e; }
+    @keyframes shake { 20%,60%{ transform:translateX(-6px);} 40%,80%{ transform:translateX(6px);} }
+    .key-error { margin-top:.5rem; font-size:.875rem; font-weight:700; color:var(--danger); }
+
+    /* ===== Métricas y gráficos ===== */
+    .kpi-grid { display:grid; gap:.75rem; }
+    .metric { background:#fff; border:1px solid var(--line); border-radius:16px; padding:16px; min-width:0; position:relative; overflow:hidden; }
+    .metric.kpi::before { content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--cyan); }
+    .metric.kpi.energy::before { background:var(--orange); }
+    .metric.kpi p { font-size:.85rem; font-weight:700; color:var(--muted); }
+    .metric.kpi strong { display:block; margin-top:.25rem; font-family:'Fraunces',serif; font-size:1.9rem; font-variant-numeric:tabular-nums; }
+    .metric.kpi small { color:var(--muted); }
+    .charts-help { margin:.5rem 0 1.25rem; }
+    .chart-grid { display:grid; gap:1rem; }
+    .chart-card h3 { display:flex; align-items:center; gap:.5rem; margin-bottom:.5rem; font-weight:700; }
+    .eq { display:inline-block; margin-bottom:.75rem; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:.75rem; color:var(--muted); background:var(--soft); padding:.35rem .55rem; border-radius:8px; }
+    .chart-box { height:220px; position:relative; }
+
+    /* ===== Preguntas y pasos ===== */
+    .questions { counter-reset:q; }
+    .questions > * + * { margin-top:.75rem; }
+    .questions h3 { counter-increment:q; position:relative; padding:14px 16px 14px 58px; border-radius:14px; background:#fff; border:1px solid var(--line); font-weight:600; line-height:1.5; }
+    .questions h3::before { content:counter(q); position:absolute; left:14px; top:12px; width:30px; height:30px; border-radius:9px; display:grid; place-items:center; background:var(--cyan-l); color:var(--cyan-d); font-family:'Fraunces',serif; font-weight:700; }
+    .steps { counter-reset:s; line-height:1.625; }
+    .steps li { counter-increment:s; position:relative; padding-left:44px; min-height:30px; }
+    .steps li + li { margin-top:1rem; }
+    .steps li::before { content:counter(s); position:absolute; left:0; top:-2px; width:30px; height:30px; border-radius:50%; display:grid; place-items:center; background:var(--orange-l); color:#a84f16; font-weight:700; font-size:.85rem; }
+    .steps li:not(:last-child)::after { content:""; position:absolute; left:14.5px; top:30px; bottom:-12px; border-left:2px dotted #e6c3a8; }
+    .model-box { margin-top:1.5rem; border-radius:14px; padding:16px; background:linear-gradient(135deg,#e0f0f0,#eef6f3); border:1px solid #cfe3e2; }
+    .model-box h3 { font-weight:700; }
+    .model-desc { margin-top:.5rem; line-height:1.625; font-size:.875rem; color:#3f5a64; }
+    .formula { font-family:'Fraunces',serif; font-size:1.05rem; display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.6rem; }
+    .formula span { background:#fff; padding:.3rem .65rem; border-radius:8px; border:1px solid #cfe3e2; }
+    .download-btn { margin-top:1.5rem; }
+    .download-note { margin-top:.5rem; }
+
+    /* ===== Pie ===== */
+    .site-footer { display:flex; flex-wrap:wrap; justify-content:space-between; gap:.5rem; margin-top:2.5rem; padding:1.5rem 0 .5rem; border-top:1px solid #ffffff1a; font-size:.875rem; color:#a9c6c8; }
+    .site-footer strong { color:#fff; }
+
+    /* ===== Animaciones ===== */
+    .reveal { animation:rise .6s both; }
+    .reveal:nth-child(2) { animation-delay:.1s; }
+    #unlocked > section { animation:rise .5s both; }
+    @keyframes rise { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
+    @media (prefers-reduced-motion:reduce) { .reveal,#unlocked > section,.spark.on,.key-panel,.table-input.is-filling,.key-field.shake { animation:none; } }
+
+    /* ===== Diseño adaptable ===== */
+    @media (min-width:640px) {
+      .kpi-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    }
+    @media (min-width:768px) {
+      .shell { padding:56px 32px; }
+      .panel { padding:1.5rem; }
+      .panel.roomy { padding:1.75rem; }
+      .chart-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    }
+    @media (min-width:1024px) {
+      .layout-top { grid-template-columns:350px minmax(0,1fr); }
+      .layout-bottom { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    }
+    @media (min-width:1280px) {
+      .kpi-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
+    }
+  </style>
+  <script src="/_sdk/47b49acbce8d4e14.data_sdk.js" type="text/javascript" integrity="sha512-Q7ocGwX+GJGp9twzwnkXfCUAwQkaCh99VK0LYmxqjQvV3IEFlYrnsSbtoFLMg9907WJYePujU3Tm4/KkNQa1wA=="></script>
+  <script src="/_sdk/890a5f4ddb275cc5.editing_sdk.js" type="text/javascript" integrity="sha512-0K57fZh1rG6z89L8BoFTCNVnblOv12+Yt/yA+4wXgpjUxzP6PPqMLqLT/9ZPI2IG4eIgPfCa8CmGqY0hkmDX6g=="></script>
+  <script src="/_sdk/c774963abc6f03de.resizing_sdk.js" type="text/javascript" integrity="sha512-fVA81vJnL46vGKioyJJbk3XaJjdaKaDnDMTShVQ1S1kBQM4xcUhuy93NTuRYEspgyUVmkpVo4DcQ4X0vP2kYcQ=="></script>
+ </head>
+ <body data-template-id="__page-root">
+  <div class="shell">
+   <div class="container">
+
+    <header class="hero">
+     <p data-template-id="eyebrow" class="canva-text eyebrow">KINGSTON COLLEGE · DEPARTAMENTO DE CIENCIAS — FÍSICA</p>
+     <div>
+      <p class="credit">
+       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+       Creado por <strong>Israel H. Mena M.</strong>
+      </p>
+     </div>
+     <h1 data-template-id="page-title" class="canva-text page-title">Simulador de <em>choques y colisiones</em></h1>
+     <p data-template-id="page-intro" class="canva-text intro">Explora qué ocurre con el momentum lineal y la energía cinética cuando dos cuerpos chocan en una dimensión. Configura la situación, observa el choque, completa la tabla y analiza los gráficos.</p>
+     <div class="chips">
+      <span class="chip">Choque unidimensional</span><span class="chip">Conservación del momentum</span><span class="chip">Energía cinética</span><span class="chip">Gráficos x–t</span>
+     </div>
+    </header>
+
+    <main class="stack">
+     <div class="layout-top">
+      <section data-template-id="controls-panel" class="canva-panel surface panel reveal" aria-labelledby="controls-title">
+       <div class="card-head">
+        <span class="icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg></span>
+        <h2 data-template-id="controls-title" id="controls-title" class="canva-text">Condiciones iniciales</h2>
+       </div>
+       <p data-template-id="controls-help" class="canva-text help relaxed lead-gap">Define la masa y la velocidad de cada cuerpo antes del choque. Las velocidades negativas indican movimiento hacia la izquierda.</p>
+       <form id="settings" class="settings-grid">
+        <div>
+         <label data-template-id="mass-one-label" class="canva-text field-label" for="m1"><span class="body-tag tag-cyan"></span>Masa cuerpo 1</label>
+         <div class="field-wrap"><input id="m1" class="field" type="number" min="0.01" max="20" step="any" value="1" required><span class="unit">kg</span></div>
+        </div>
+        <div>
+         <label data-template-id="mass-two-label" class="canva-text field-label" for="m2"><span class="body-tag tag-orange"></span>Masa cuerpo 2</label>
+         <div class="field-wrap"><input id="m2" class="field" type="number" min="0.01" max="20" step="any" value="2" required><span class="unit">kg</span></div>
+        </div>
+        <div>
+         <label data-template-id="speed-one-label" class="canva-text field-label" for="u1"><span class="body-tag tag-cyan"></span>Velocidad 1</label>
+         <div class="field-wrap"><input id="u1" class="field" type="number" min="-5" max="5" step="any" value="2" required><span class="unit">m/s</span></div>
+        </div>
+        <div>
+         <label data-template-id="speed-two-label" class="canva-text field-label" for="u2"><span class="body-tag tag-orange"></span>Velocidad 2</label>
+         <div class="field-wrap"><input id="u2" class="field" type="number" min="-5" max="5" step="any" value="-1" required><span class="unit">m/s</span></div>
+        </div>
+       </form>
+       <div class="rule-box">Rangos: masas entre 0 y 20 kg, velocidades entre −5 y 5 m/s. Para que haya choque, la velocidad del cuerpo 1 debe ser mayor que la del cuerpo 2.</div>
+       <p id="error" class="hidden error-msg" role="alert"></p>
+      </section>
+
+      <section data-template-id="simulation-panel" class="canva-panel surface panel reveal" aria-labelledby="sim-title">
+       <div class="sim-head">
+        <div class="card-head flush">
+         <span class="icon-badge orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="12" r="4"/><circle cx="17" cy="12" r="4"/><path d="M12 4v2M12 18v2"/></svg></span>
+         <div>
+          <h2 data-template-id="sim-title" id="sim-title" class="canva-text">Simulación del choque</h2>
+          <p data-template-id="sim-subtitle" class="canva-text help sim-subtitle">Observa el movimiento de ambos cuerpos antes y después del impacto.</p>
+         </div>
+        </div>
+        <span id="phase" class="phase" aria-live="polite">Antes del impacto</span>
+       </div>
+       <div class="track" role="img" aria-label="Dos cuerpos se desplazan sobre una pista recta">
+        <div class="center-line"></div>
+        <div class="ticks"></div>
+        <div id="spark" class="spark"></div>
+        <div id="ball1" class="ball ball-one">1<span id="vtag1" class="vtag"></span></div>
+        <div id="ball2" class="ball ball-two">2<span id="vtag2" class="vtag"></span></div>
+       </div>
+       <div class="track-legend">
+        <span>← Dirección negativa</span><span>Dirección positiva →</span>
+       </div>
+       <div class="btn-row">
+        <button data-template-id="play-button" id="play" type="button" class="canva-button btn btn-primary"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg>Reproducir</button>
+        <button data-template-id="pause-button" id="pause" type="button" class="canva-button btn btn-ghost"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>Pausar</button>
+        <button data-template-id="reset-button" id="reset" type="button" class="canva-button btn btn-ghost"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>Reiniciar</button>
+       </div>
+      </section>
+     </div>
+
+     <section data-template-id="results-panel" class="canva-section surface panel roomy reveal" aria-labelledby="results-title">
+      <div class="card-head">
+       <span class="icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10M15 10v10"/></svg></span>
+       <h2 data-template-id="results-title" id="results-title" class="canva-text">Tabla de resultados</h2>
+      </div>
+      <p data-template-id="results-help" class="canva-text help lead-gap">Calcula cada valor y escríbelo con dos decimales (puedes usar coma o punto). Recuerda: K = ½·m·v² y p = m·v.</p>
+      <div class="table-wrap">
+       <table class="data-table">
+        <thead>
+         <tr>
+          <th scope="col">Objeto</th>
+          <th scope="col">Masa [kg]</th>
+          <th scope="col">Vel. inicial [m/s]</th>
+          <th scope="col">Vel. final [m/s]</th>
+          <th scope="col" class="grp-e">Energía inicial [J]</th>
+          <th scope="col" class="grp-e">Energía final [J]</th>
+          <th scope="col" class="grp-p">Momentum inicial [kg·m/s]</th>
+          <th scope="col" class="grp-p">Momentum final [kg·m/s]</th>
+         </tr>
+        </thead>
+        <tbody>
+         <tr>
+          <th scope="row"><span class="body-tag tag-cyan"></span>Cuerpo 1</th>
+          <td><input id="c1m" class="table-input" aria-label="Cuerpo 1, masa" inputmode="decimal"></td>
+          <td><input id="c1u" class="table-input" aria-label="Cuerpo 1, velocidad inicial" inputmode="decimal"></td>
+          <td><input id="c1v" class="table-input" aria-label="Cuerpo 1, velocidad final" inputmode="decimal"></td>
+          <td><input id="c1ki" class="table-input" aria-label="Cuerpo 1, energía inicial" inputmode="decimal"></td>
+          <td><input id="c1kf" class="table-input" aria-label="Cuerpo 1, energía final" inputmode="decimal"></td>
+          <td><input id="c1pi" class="table-input" aria-label="Cuerpo 1, momentum inicial" inputmode="decimal"></td>
+          <td><input id="c1pf" class="table-input" aria-label="Cuerpo 1, momentum final" inputmode="decimal"></td>
+         </tr>
+         <tr>
+          <th scope="row"><span class="body-tag tag-orange"></span>Cuerpo 2</th>
+          <td><input id="c2m" class="table-input" aria-label="Cuerpo 2, masa" inputmode="decimal"></td>
+          <td><input id="c2u" class="table-input" aria-label="Cuerpo 2, velocidad inicial" inputmode="decimal"></td>
+          <td><input id="c2v" class="table-input" aria-label="Cuerpo 2, velocidad final" inputmode="decimal"></td>
+          <td><input id="c2ki" class="table-input" aria-label="Cuerpo 2, energía inicial" inputmode="decimal"></td>
+          <td><input id="c2kf" class="table-input" aria-label="Cuerpo 2, energía final" inputmode="decimal"></td>
+          <td><input id="c2pi" class="table-input" aria-label="Cuerpo 2, momentum inicial" inputmode="decimal"></td>
+          <td><input id="c2pf" class="table-input" aria-label="Cuerpo 2, momentum final" inputmode="decimal"></td>
+         </tr>
+        </tbody>
+       </table>
+      </div>
+      <div class="review-row">
+       <button data-template-id="review-button" id="review" type="button" class="canva-button btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Revisar respuestas</button>
+       <button id="teacher" type="button" class="btn btn-teacher"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Revisar respuestas profesor</button>
+       <p id="feedback" class="feedback is-muted" role="status" aria-live="polite">Completa la tabla y revisa tus respuestas para desbloquear los gráficos.</p>
+      </div>
+      <div id="key-form" class="key-panel hidden" role="group" aria-labelledby="key-title">
+       <div class="card-head">
+        <span class="icon-badge teacher"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span>
+        <h3 id="key-title" class="key-title">Acceso del profesor</h3>
+       </div>
+       <p class="help small key-help">Ingresa la clave para completar automáticamente la tabla a partir de las masas y velocidades configuradas.</p>
+       <div class="key-row">
+        <input id="key-input" class="field key-field" type="password" inputmode="numeric" autocomplete="off" placeholder="Clave" aria-label="Clave del profesor">
+        <button id="key-submit" type="button" class="btn btn-teacher">Completar tabla</button>
+        <button id="key-cancel" type="button" class="btn btn-ghost">Cancelar</button>
+       </div>
+       <p id="key-error" class="hidden key-error" role="alert">Clave incorrecta. Inténtalo nuevamente.</p>
+      </div>
+     </section>
+
+     <section id="unlocked" class="hidden stack">
+      <section data-template-id="totals-panel" class="canva-section surface panel roomy" aria-labelledby="totals-title">
+       <div class="card-head spaced">
+        <span class="icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 9h14M5 15h14"/></svg></span>
+        <h2 data-template-id="totals-title" id="totals-title" class="canva-text">Totales del sistema</h2>
+       </div>
+       <div class="kpi-grid">
+        <div class="metric kpi">
+         <p data-template-id="momentum-before-label" class="canva-text">Momentum total antes</p><strong id="p-before"></strong><small>kg·m/s</small>
+        </div>
+        <div class="metric kpi">
+         <p data-template-id="momentum-after-label" class="canva-text">Momentum total después</p><strong id="p-after"></strong><small>kg·m/s</small>
+        </div>
+        <div class="metric kpi energy">
+         <p data-template-id="energy-before-label" class="canva-text">Energía cinética total antes</p><strong id="k-before"></strong><small>J</small>
+        </div>
+        <div class="metric kpi energy">
+         <p data-template-id="energy-after-label" class="canva-text">Energía cinética total después</p><strong id="k-after"></strong><small>J</small>
+        </div>
+       </div>
+      </section>
+      <section data-template-id="charts-panel" class="canva-section surface panel roomy" aria-labelledby="charts-title">
+       <div class="card-head flush">
+        <span class="icon-badge orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg></span>
+        <h2 data-template-id="charts-title" id="charts-title" class="canva-text">Gráficos posición–tiempo</h2>
+       </div>
+       <p data-template-id="charts-help" class="canva-text help relaxed charts-help">Cada gráfico muestra la posición simulada y su tendencia lineal. La pendiente de la recta corresponde a la velocidad del cuerpo en ese tramo.</p>
+       <div class="chart-grid">
+        <div class="metric chart-card">
+         <h3 data-template-id="graph-one-title" class="canva-text"><span class="body-tag tag-cyan"></span>Cuerpo 1 · antes del impacto</h3>
+         <p id="eq1" class="eq"></p>
+         <div class="chart-box"><canvas id="chart1" role="img" aria-label="Posición frente a tiempo del cuerpo 1 antes del impacto"></canvas></div>
+        </div>
+        <div class="metric chart-card">
+         <h3 data-template-id="graph-two-title" class="canva-text"><span class="body-tag tag-cyan"></span>Cuerpo 1 · después del impacto</h3>
+         <p id="eq2" class="eq"></p>
+         <div class="chart-box"><canvas id="chart2" role="img" aria-label="Posición frente a tiempo del cuerpo 1 después del impacto"></canvas></div>
+        </div>
+        <div class="metric chart-card">
+         <h3 data-template-id="graph-three-title" class="canva-text"><span class="body-tag tag-orange"></span>Cuerpo 2 · antes del impacto</h3>
+         <p id="eq3" class="eq"></p>
+         <div class="chart-box"><canvas id="chart3" role="img" aria-label="Posición frente a tiempo del cuerpo 2 antes del impacto"></canvas></div>
+        </div>
+        <div class="metric chart-card">
+         <h3 data-template-id="graph-four-title" class="canva-text"><span class="body-tag tag-orange"></span>Cuerpo 2 · después del impacto</h3>
+         <p id="eq4" class="eq"></p>
+         <div class="chart-box"><canvas id="chart4" role="img" aria-label="Posición frente a tiempo del cuerpo 2 después del impacto"></canvas></div>
+        </div>
+       </div>
+      </section>
+     </section>
+
+     <div class="layout-bottom">
+      <aside data-template-id="method-panel" class="canva-panel surface panel roomy" aria-labelledby="method-title">
+       <div class="card-head spaced">
+        <span class="icon-badge orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h6M10 3v6L4.5 18.5A2 2 0 0 0 6.2 21.5h11.6a2 2 0 0 0 1.7-3L14 9V3"/><path d="M7.5 15h9"/></svg></span>
+        <h2 data-template-id="method-title" id="method-title" class="canva-text">De la simulación al laboratorio</h2>
+       </div>
+       <ol class="steps">
+        <li data-template-id="method-one" class="canva-text">Dispón los cuerpos en línea recta sobre una superficie plana y coloca una regla u objeto de longitud conocida.</li>
+        <li data-template-id="method-two" class="canva-text">Mide las masas con una balanza y registra los valores en kilogramos.</li>
+        <li data-template-id="method-three" class="canva-text">Graba el movimiento, preferentemente a 30 fotogramas por segundo o más.</li>
+        <li data-template-id="method-four" class="canva-text">En Tracker, calibra la escala en metros, establece los ejes y sigue cada cuerpo como masa puntual.</li>
+        <li data-template-id="method-five" class="canva-text">En Excel, separa posiciones anteriores y posteriores, crea gráficos con tendencias y completa la tabla y las respuestas de la guía.</li>
+       </ol>
+       <div class="model-box">
+        <h3 data-template-id="model-title" class="canva-text">Modelo físico: choque elástico</h3>
+        <p data-template-id="model-description" class="canva-text model-desc">En un choque elástico ideal en una dimensión se conservan tanto el momentum lineal como la energía cinética total del sistema.</p>
+        <div class="formula"><span>p = m·v</span><span>K = ½·m·v²</span><span>Σp<sub>i</sub> = Σp<sub>f</sub></span></div>
+       </div>
+       <button data-template-id="download-button" id="download" type="button" disabled class="canva-button btn btn-accent download-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Descargar datos (CSV)</button>
+       <p data-template-id="download-note" class="canva-text help small download-note">Se habilita cuando la tabla está completamente correcta.</p>
+      </aside>
+      <section data-template-id="interpretation-panel" class="canva-section surface panel roomy" aria-labelledby="interpretation-title">
+       <div class="card-head spaced">
+        <span class="icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/></svg></span>
+        <h2 data-template-id="interpretation-title" id="interpretation-title" class="canva-text">Preguntas de análisis</h2>
+       </div>
+       <div class="questions">
+        <h3 data-template-id="question-one" class="canva-text">¿Se conserva el momentum total del sistema? Justifica comparando los valores antes y después del choque.</h3>
+        <h3 data-template-id="question-two" class="canva-text">¿Se conserva la energía cinética total? ¿Qué tipo de choque representa la simulación?</h3>
+        <h3 data-template-id="question-three" class="canva-text">¿Qué relación existe entre la pendiente de cada gráfico posición–tiempo y la velocidad del cuerpo?</h3>
+        <h3 data-template-id="question-four" class="canva-text">¿Cómo cambian las velocidades finales si ambos cuerpos tienen la misma masa? Pruébalo en el simulador.</h3>
+       </div>
+      </section>
+     </div>
+    </main>
+
+    <footer class="site-footer">
+     <p data-template-id="footer-note" class="canva-text">Kingston College · Departamento de Ciencias — Física</p>
+     <p>Creado por <strong>Israel H. Mena M.</strong></p>
+    </footer>
+   </div>
+  </div>
+  <script>
+    const byId = id => document.getElementById(id);
+    const fmt = value => (Math.abs(value) < 0.000005 ? 0 : value).toLocaleString('es-CL', {minimumFractionDigits:2,maximumFractionDigits:2});
+    const columns = ['m','u','v','ki','kf','pi','pf'];
+    const inputs = [...document.querySelectorAll('.table-input')];
+    const impactAt = 1.3, afterDuration = 1.5, radius = .11;
+    let model = null, charts = [], playing = false, frame = 0, lastFrame = 0, elapsed = 0, sparked = false;
+    let fillToken = 0, filling = false;
+
+    function setFeedback(text, tone) {
+      const el = byId('feedback');
+      if (text) el.textContent = text;
+      el.className = 'feedback is-' + tone;
+    }
+    function readModel() {
+      const values = ['m1','m2','u1','u2'].map(id => byId(id).value.trim());
+      if (values.some(value => value === '')) return null;
+      const [m1,m2,u1,u2] = values.map(Number);
+      if (![m1,m2,u1,u2].every(Number.isFinite) || m1 <= 0 || m2 <= 0 || m1 > 20 || m2 > 20 || Math.abs(u1) > 5 || Math.abs(u2) > 5 || u1 <= u2) return null;
+      // Colisión elástica ideal; el parámetro no aparece como control.
+      const v1 = ((m1-m2)*u1+2*m2*u2)/(m1+m2);
+      const v2 = (2*m1*u1+(m2-m1)*u2)/(m1+m2);
+      return {m1,m2,u1,u2,v1,v2,contact1:-radius,contact2:radius,
+        initial1:-radius-u1*impactAt,initial2:radius-u2*impactAt};
+    }
+    function expected(body,key) {
+      const m=model['m'+body], u=model['u'+body], v=model['v'+body];
+      return {m,u,v,ki:.5*m*u*u,kf:.5*m*v*v,pi:m*u,pf:m*v}[key];
+    }
+    function position(body,t) {
+      return t <= impactAt
+        ? model['initial'+body]+model['u'+body]*t
+        : model['contact'+body]+model['v'+body]*(t-impactAt);
+    }
+    function drawTrack() {
+      if (!model) return;
+      const range=Math.max(2.8,...[0,impactAt,impactAt+afterDuration].flatMap(t=>[Math.abs(position(1,t)),Math.abs(position(2,t))]))+.35;
+      const after=elapsed>=impactAt;
+      for (let body=1;body<=2;body++) {
+        byId('ball'+body).style.left=(50+44*position(body,elapsed)/range)+'%';
+        byId('vtag'+body).textContent='v = '+fmt(model[(after?'v':'u')+body])+' m/s';
+      }
+      byId('phase').textContent=after?'Después del impacto':'Antes del impacto';
+      byId('phase').classList.toggle('after',after);
+      if (after && !sparked && playing) {
+        sparked=true; const s=byId('spark'); s.classList.remove('on'); void s.offsetWidth; s.classList.add('on');
+      }
+      if (!after) sparked=false;
+    }
+    function stop() { playing=false; cancelAnimationFrame(frame); lastFrame=0; }
+    function tick(time) {
+      if (!playing) return;
+      if (lastFrame) elapsed=Math.min(impactAt+afterDuration,elapsed+(time-lastFrame)/1000);
+      lastFrame=time; drawTrack();
+      if (elapsed>=impactAt+afterDuration) { stop(); return; }
+      frame=requestAnimationFrame(tick);
+    }
+    function lockResults(message) {
+      byId('unlocked').classList.add('hidden');
+      byId('download').disabled=true;
+      charts.forEach(chart=>chart.destroy()); charts=[];
+      setFeedback(message,'muted');
+    }
+    function refresh() {
+      stop(); elapsed=0; model=readModel();
+      lockResults('Completa la tabla y revisa tus respuestas para desbloquear los gráficos.');
+      fillToken++; filling=false;
+      inputs.forEach(input=>{ input.value=''; input.classList.remove('is-wrong','is-filled','is-filling'); input.removeAttribute('aria-invalid'); });
+      if (!model) {
+        byId('error').textContent='Ingresa masas entre 0 y 20 kg, velocidades entre −5 y 5 m/s y una velocidad inicial del cuerpo 1 mayor que la del cuerpo 2.';
+        byId('error').classList.remove('hidden');
+        byId('play').disabled=true; byId('review').disabled=true; byId('teacher').disabled=true;
+        return;
+      }
+      byId('error').classList.add('hidden');
+      byId('play').disabled=false; byId('review').disabled=false; byId('teacher').disabled=false;
+      drawTrack();
+    }
+    function samples(body,after) {
+      const start=after?impactAt:0, end=after?impactAt+afterDuration:impactAt, points=[];
+      for (let step=0;step<=Math.ceil((end-start)*30);step++) {
+        const t=Math.min(end,start+step/30);
+        if (!points.length || t>points[points.length-1].x) points.push({x:t,y:position(body,t)});
+      }
+      return points;
+    }
+    function drawCharts() {
+      if (typeof Chart==='undefined') {
+        byId('feedback').textContent='La tabla está correcta, pero no se pudieron cargar los gráficos. Vuelve a intentarlo.';
+        return;
+      }
+      Chart.defaults.font.family="'DM Sans',sans-serif";
+      Chart.defaults.color='#5a6f7a';
+      [[1,false],[1,true],[2,false],[2,true]].forEach(([body,after],index)=>{
+        const points=samples(body,after);
+        const slope=model[after?'v'+body:'u'+body];
+        const intercept=points[0].y-slope*points[0].x;
+        const color=body===1?'#0a8aa0':'#e07a35';
+        byId('eq'+(index+1)).textContent=`x(t) = ${fmt(slope)} t ${intercept<0?'−':'+'} ${fmt(Math.abs(intercept))} m · rapidez ${fmt(Math.abs(slope))} m/s`;
+        charts.push(new Chart(byId('chart'+(index+1)),{
+          type:'scatter',
+          data:{datasets:[
+            {label:'Posición simulada',data:points,pointRadius:2.5,pointBackgroundColor:color+'aa',pointBorderWidth:0},
+            {label:'Tendencia lineal',type:'line',data:[points[0],points[points.length-1]],borderColor:color,pointRadius:0,borderWidth:2.5}
+          ]},
+          options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},
+            scales:{x:{type:'linear',title:{display:true,text:'Tiempo (s)'},grid:{color:'#e6eeec'}},y:{title:{display:true,text:'Posición (m)'},grid:{color:'#e6eeec'}}}}
+        }));
+      });
+    }
+    function showTotals() {
+      const m1=model.m1,m2=model.m2,u1=model.u1,u2=model.u2,v1=model.v1,v2=model.v2;
+      byId('p-before').textContent=fmt(m1*u1+m2*u2);
+      byId('p-after').textContent=fmt(m1*v1+m2*v2);
+      byId('k-before').textContent=fmt(.5*m1*u1*u1+.5*m2*u2*u2);
+      byId('k-after').textContent=fmt(.5*m1*v1*v1+.5*m2*v2*v2);
+    }
+    function review() {
+      if (!model) return;
+      let incorrect=0;
+      inputs.forEach(input=>{
+        const body=Number(input.id[1]), key=input.id.slice(2);
+        const raw=input.value.trim().replace(',','.');
+        const value=Number(raw);
+        const wrong=raw==='' || !Number.isFinite(value) || Math.abs(value-expected(body,key))>0.010001;
+        input.classList.toggle('is-wrong',wrong);
+        if (wrong) { input.setAttribute('aria-invalid','true'); incorrect++; }
+        else input.removeAttribute('aria-invalid');
+      });
+      if (incorrect) {
+        lockResults();
+        setFeedback(`${incorrect} ${incorrect===1?'valor necesita':'valores necesitan'} corrección. Revisa las celdas marcadas en rojo y vuelve a intentarlo.`,'error');
+        return;
+      }
+      showTotals();
+      byId('unlocked').classList.remove('hidden');
+      byId('download').disabled=false;
+      setFeedback('¡Tabla correcta! Ya puedes consultar los gráficos.','ok');
+      drawCharts();
+    }
+    ['m1','m2','u1','u2'].forEach(id=>byId(id).addEventListener('input',refresh));
+    byId('settings').addEventListener('submit',event=>event.preventDefault());
+    inputs.forEach(input=>input.addEventListener('input',()=>{
+      input.classList.remove('is-wrong','is-filled'); input.removeAttribute('aria-invalid');
+      lockResults('Respuesta modificada. Pulsa «Revisar respuestas» para comprobar la tabla de nuevo.');
+    }));
+    byId('review').addEventListener('click',review);
+
+    // ----- Revisión del profesor -----
+    const TEACHER_KEY='284933788';
+    const panel=byId('key-form'), keyInput=byId('key-input'), keyError=byId('key-error');
+    function openKey() {
+      if (!model || filling) return;
+      if (!panel.classList.contains('hidden')) { keyInput.focus(); return; }
+      keyInput.value=''; keyError.classList.add('hidden'); keyInput.classList.remove('shake');
+      panel.classList.remove('hidden');
+      panel.scrollIntoView({block:'nearest',behavior:'smooth'});
+      setTimeout(()=>keyInput.focus({preventScroll:true}),60);
+    }
+    function closeKey() { panel.classList.add('hidden'); byId('teacher').focus({preventScroll:true}); }
+    const wait=ms=>new Promise(r=>setTimeout(r,ms));
+    const toCell=v=>(Math.abs(v)<0.000005?0:v).toFixed(2).replace('.',',');
+    async function teacherFill() {
+      if (!model) return;
+      const token=++fillToken; filling=true;
+      ['review','teacher'].forEach(id=>byId(id).disabled=true);
+      setFeedback('Completando la tabla…','teacher');
+      for (const input of inputs) {
+        const body=Number(input.id[1]), key=input.id.slice(2);
+        const target=expected(body,key);
+        const raw=input.value.trim().replace(',','.');
+        const ok=raw!=='' && Number.isFinite(Number(raw)) && Math.abs(Number(raw)-target)<=0.010001;
+        if (ok) { input.classList.remove('is-wrong'); input.removeAttribute('aria-invalid'); continue; }
+        input.scrollIntoView({block:'nearest',inline:'nearest',behavior:'smooth'});
+        input.classList.remove('is-wrong','is-filled'); input.removeAttribute('aria-invalid');
+        input.classList.add('is-filling');
+        const final=toCell(target), steps=8;
+        for (let i=1;i<=steps;i++) {
+          if (token!==fillToken) return;
+          input.value=toCell(target*i/steps);
+          await wait(28);
+        }
+        input.value=final;
+        await wait(90);
+        if (token!==fillToken) return;
+        input.classList.remove('is-filling'); input.classList.add('is-filled');
+      }
+      filling=false;
+      ['review','teacher'].forEach(id=>byId(id).disabled=false);
+      review();
+      if (!byId('unlocked').classList.contains('hidden'))
+        byId('feedback').textContent='Tabla completada por el profesor. Ya puedes consultar los gráficos.';
+    }
+    function submitKey() {
+      if (keyInput.value.trim()!==TEACHER_KEY) {
+        keyError.classList.remove('hidden');
+        keyInput.classList.remove('shake'); void keyInput.offsetWidth; keyInput.classList.add('shake');
+        keyInput.select(); return;
+      }
+      panel.classList.add('hidden');
+      teacherFill();
+    }
+    byId('teacher').addEventListener('click',openKey);
+    byId('key-cancel').addEventListener('click',closeKey);
+    byId('key-submit').addEventListener('click',submitKey);
+    keyInput.addEventListener('keydown',e=>{ if (e.key==='Enter') { e.preventDefault(); submitKey(); } });
+    document.addEventListener('keydown',e=>{ if (e.key==='Escape' && !panel.classList.contains('hidden')) closeKey(); });
+
+    byId('play').addEventListener('click',()=>{
+      if (!model || playing) return;
+      if (elapsed>=impactAt+afterDuration) elapsed=0;
+      playing=true; frame=requestAnimationFrame(tick);
+    });
+    byId('pause').addEventListener('click',stop);
+    byId('reset').addEventListener('click',()=>{ stop(); elapsed=0; drawTrack(); });
+    byId('download').addEventListener('click',()=>{
+      if (!model || byId('download').disabled) return;
+      const rows=[
+        ['Tipo de datos','Simulación ideal; no mediciones de Tracker'],
+        [],
+        ['Cuerpo','Masa [kg]','Velocidad inicial [m/s]','Velocidad final [m/s]','Energía inicial [J]','Energía final [J]','Momentum inicial [kg·m/s]','Momentum final [kg·m/s]'],
+        ...[1,2].map(body=>['Cuerpo '+body,...columns.map(key=>expected(body,key))]),
+        [],['Cuerpo','Fase','Tiempo [s]','Posición [m]']
+      ];
+      for (let body=1;body<=2;body++) for (const after of [false,true])
+        for (const point of samples(body,after)) rows.push(['Cuerpo '+body,after?'Después':'Antes',point.x,point.y]);
+      const csv='﻿'+rows.map(row=>row.map(value=>'"'+String(value??'').replaceAll('"','""')+'"').join(';')).join('\r\n');
+      const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+      const link=document.createElement('a'); link.href=url; link.download='simulacion_choques_colisiones.csv'; link.click();
+      setTimeout(()=>URL.revokeObjectURL(url),1000);
+    });
+    refresh();
+  </script>
+ </body>
+</html>
